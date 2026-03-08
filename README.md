@@ -1,161 +1,169 @@
-# Starbucks Customer Ordering Patterns ☕
+# Starbucks Customer Segmentation and Analytics ☕
 
-A customer segmentation project built from transactional Starbucks-style order data. This analysis moves from raw order-level records to customer-level behavioral features, then uses clustering to identify distinct customer groups.
+This project analyzes Starbucks-style order data to understand customer behavior, identify meaningful customer groups, and present the results in both a notebook and an interactive dashboard.
 
-## Project Overview 📌
+## Project Goal 🎯
 
-The goal of this project is to understand how customers differ in terms of:
+The goal of this project is simple: understand how customers behave and group similar customers together in a way that is useful for business decisions.
 
-- spending behavior
-- ordering frequency
-- convenience preference
-- customization habits
-- satisfaction patterns
+I wanted to answer questions like:
 
-Instead of jumping straight into clustering, the notebook follows a structured workflow:
+- Who spends more?
+- Who prefers mobile ordering?
+- Who orders ahead more often?
+- Who seems more value-focused?
+- What kind of customer groups can help with offers, loyalty, and customer experience?
 
-1. understand the dataset
-2. check data quality
-3. explore behavior with question-driven analysis
-4. engineer customer-level features
-5. run clustering and interpret the resulting segments
+## Dataset Summary 📊
 
-## Dataset Snapshot 📊
-
-- `100,000` orders
+- `100,000` order records
 - `14,988` unique customers
 - `500` stores
 - Date range: `2024-01-01` to `2025-12-30`
-- Granularity: one row per order
+- Each row represents one order
 - Duplicate `order_id` rows: `0`
 
-Since the raw data is at the order level, segmentation was performed only after aggregating behavior at the `customer_id` level.
+Since the data is at the order level, I first converted it into customer-level behavior before building segments.
 
-## Repository Contents 🗂️
+## Project Files 🗂️
 
-- `starbucks_customer_segmentation.ipynb` : main analysis notebook
-- `starbucks_customer_ordering_patterns.csv` : raw dataset
-- `customer_segments_output.csv` : customer-level output with assigned segments
-- `project_plan.md` : project roadmap and analysis flow
+- `starbucks_customer_segmentation.ipynb`  
+  Main notebook for analysis, feature creation, clustering, and segment interpretation.
 
-## Analysis Workflow 🔎
+- `app.py`  
+  FastAPI backend for the dashboard.
 
-The notebook is organized into the following stages:
+- `templates/index.html`  
+  Main dashboard layout.
 
-1. data loading and structure checks
-2. numeric and categorical review
-3. question-based exploratory analysis
-4. customer-level aggregation
-5. feature engineering for segmentation
-6. feature validation and redundancy checks
-7. K-Means clustering
-8. segment profiling and business interpretation
+- `static/app.js`  
+  Frontend logic for charts and dashboard interactions.
 
-## Key Findings ✨
+- `static/style.css`  
+  Dashboard styling.
 
-### 1. Customer activity
+- `starbucks_customer_ordering_patterns.csv`  
+  Raw transactional dataset.
 
-- Customers placed about `6.7` orders each on average.
-- The typical order contains around `3.7` items.
-- Average customizations per order are about `1.8`.
-- Average order value is `$14.87`.
+- `customer_segments_output.csv`  
+  Customer-level dataset with final segment assignments.
 
-This suggests the dataset contains repeat behavior strong enough for meaningful customer segmentation.
+## What I Did 🔎
 
-### 2. Channel behavior
+The workflow followed these steps:
 
-- `Mobile App` is the largest channel with `42.5%` of all orders.
-- `Drive-Thru` contributes `28.0%`.
-- `In-Store Cashier` contributes `22.1%`.
-- `Kiosk` contributes `7.4%`.
-- Mobile App orders have the highest average spend at `$18.08`.
+1. checked the structure of the dataset
+2. reviewed missing values, summary statistics, and category distributions
+3. explored the data with business questions first
+4. built customer-level features from order history
+5. tested clustering to separate customers into groups
+6. reviewed the groups and gave them practical names
+7. built a dashboard to explore the results
 
-The biggest behavioral split in the data appears to come from convenience-oriented digital ordering versus more traditional channels.
+## Insights in Simple Terms 💡
+
+Here are the main things I found, without the technical language.
+
+### 1. Customers do come back
+
+- The same customers appear many times in the data.
+- On average, each customer placed about `6.7` orders.
+
+This means the dataset is good for customer segmentation because it captures repeat behavior, not just one-time visits.
+
+### 2. Mobile ordering is a big deal
+
+- `Mobile App` is the biggest ordering channel.
+- It accounts for `42.5%` of all orders.
+- Mobile App orders also have the highest average spend at `$18.08`.
+
+This tells us that digital behavior matters a lot. Some customers clearly prefer convenience and app-based ordering.
 
 ### 3. Rewards members behave differently
 
 Compared with non-members, rewards members:
 
-- spend more per order (`$15.72` vs `$14.09`)
-- have larger carts (`3.87` vs `3.63`)
-- customize more (`2.00` vs `1.64`)
-- use order-ahead much more often (`40.2%` vs `20.3%`)
-- report slightly higher satisfaction (`3.73` vs `3.65`)
+- spend more
+- place slightly larger orders
+- customize more
+- use order-ahead much more often
+- report slightly better satisfaction
 
-Rewards membership appears to be associated with stronger engagement and more digital convenience usage.
+In simple terms, rewards members look more engaged and more comfortable with digital convenience.
 
-### 4. Satisfaction is linked to operational experience
+### 4. Speed affects satisfaction
 
-- Satisfaction is highest when fulfillment is in the `3 to 5 minute` range.
-- Satisfaction declines for slower orders, especially `7+ minutes`.
-- `Mobile App` shows the highest average satisfaction (`3.86`).
-- `Drive-Thru` shows the lowest average satisfaction (`3.44`) and the highest fulfillment time (`5.80` minutes).
+- Satisfaction is strongest when orders are fulfilled in about `3 to 5 minutes`.
+- Satisfaction drops when orders take longer.
+- `Drive-Thru` has the lowest satisfaction and the slowest average fulfillment time.
 
-This suggests fulfillment speed and channel experience both affect how customers perceive the service.
+This suggests that service speed and ordering experience both matter to customers.
 
-## Feature Engineering for Segmentation 🧠
+### 5. The biggest customer difference is not order frequency
 
-Customer-level features were built from behavior, value, convenience, and timing patterns, including:
+The two groups were not separated mainly by how often customers ordered.
 
-- `total_orders`
-- `recency_days`
-- `order_frequency`
-- `avg_total_spend`
-- `avg_cart_size`
-- `avg_num_customizations`
-- `food_order_rate`
-- `order_ahead_rate`
-- `avg_fulfillment_time`
-- `avg_customer_satisfaction`
-- `weekend_order_rate`
-- channel mix rates
-- time-of-day ordering rates
+The real difference was:
 
-`total_revenue` was intentionally dropped from the final clustering input because it was highly correlated with `total_orders` (`r = 0.928`).
+- how they order
+- how much they spend
+- whether they use the app
+- whether they order ahead
+- how much they customize
 
-## Clustering Result 🤖
+So the strongest split in this dataset is more about customer style than customer frequency.
 
-K-Means clustering was tested across multiple values of `k`.
+## Final Customer Segments 👥
 
-- Best result in the notebook: `k = 2`
-- Silhouette score: `0.1184`
+The final result produced two main customer groups.
 
-### Segment 0: Digital Convenience Customers
+### 1. Digital Convenience Customers
 
-- `48.8%` of customers
-- higher average spend
-- more customizations
-- higher food order rate
-- much higher order-ahead usage
-- strong Mobile App preference
+- `7,309` customers (`48.8%`)
+- Higher average spend (`$16.49`)
+- Larger carts
+- More customizations
+- Much higher order-ahead usage
+- Strong Mobile App preference
 
-### Segment 1: Store-First Value Customers
+In simple terms, these are the customers who like convenience, use digital channels more, and tend to spend more per order.
 
-- `51.2%` of customers
-- lower average spend
-- fewer customizations
-- lower order-ahead usage
-- lower Mobile App usage
-- stronger Drive-Thru and In-Store presence
+### 2. Store-First Value Customers
 
-## Business Takeaway 💡
+- `7,679` customers (`51.2%`)
+- Lower average spend (`$13.33`)
+- Smaller carts
+- Fewer customizations
+- Lower order-ahead usage
+- More Drive-Thru and In-Store behavior
 
-The strongest separation in this dataset is not simply frequent vs infrequent customers. The major difference is how customers order:
+In simple terms, these customers look more traditional in how they order and seem more value-conscious.
 
-- digital vs traditional channel behavior
-- convenience preference
-- customization intensity
-- average spend pattern
-- order-ahead usage
+## Business Meaning 📌
 
-This makes the segmentation useful for:
+These segments can help answer real business questions:
 
-- personalized offers
-- loyalty targeting
-- channel-specific campaigns
-- operational improvements for lower-satisfaction groups
+- Which customers should get app-focused offers?
+- Which customers may respond better to value bundles?
+- Which customers are better targets for rewards sign-up campaigns?
+- Which customer group may need better service experience?
 
-## Tools and Libraries 🛠️
+That is why this segmentation is useful beyond just the model itself.
+
+## Dashboard Features 🖥️
+
+Along with the notebook, I built a FastAPI dashboard to explore the results.
+
+The dashboard includes:
+
+- segment summaries
+- customer search and profile view
+- churn scoring
+- drink recommendation logic
+- campaign simulation by segment
+- order trend analysis
+
+## Tools Used 🛠️
 
 - Python
 - Pandas
@@ -163,26 +171,37 @@ This makes the segmentation useful for:
 - Matplotlib
 - Seaborn
 - Scikit-learn
+- FastAPI
+- Jinja2
+- Chart.js
 
 ## How to Run ▶️
 
-Run the notebook locally:
+### Run the notebook
 
 ```bash
 jupyter notebook starbucks_customer_segmentation.ipynb
 ```
 
-Then execute the cells in order.
+### Run the dashboard
 
-## Future Scope 🚀
+```bash
+uvicorn app:app --reload
+```
 
-Possible next steps for this project:
+Then open:
 
-- improve manual interpretation of the segments
-- compare K-Means with other clustering approaches
-- build a recommendation system using customer preferences and segment patterns
-- connect segment outputs to marketing or retention strategies
+```bash
+http://127.0.0.1:8000
+```
+
+## Future Improvements 🚀
+
+- improve the recommendation system
+- compare this clustering approach with other methods
+- connect the segments to actual marketing actions
+- test how these segments behave over time
 
 ## Final Note
 
-This project was built with a simple principle: understand the data properly before modeling. The notebook focuses on step-by-step analysis so the segmentation results remain interpretable and business-relevant.
+This project is not just about grouping customers with a model. It is about understanding customer behavior in a clear way and turning that into something practical through both analysis and a working dashboard.
