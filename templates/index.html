@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Starbucks customer segmentation dashboard with segment analysis, customer profiles, churn scoring, and campaign testing">
+    <title>Starbucks Customer Segmentation Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+
+<body>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <div class="header-logo">S</div>
+            <div>
+                <h1>Customer <span>Segmentation Dashboard</span></h1>
+            </div>
+        </div>
+        <div class="header-meta" id="headerMeta">Loading...</div>
+    </header>
+
+    <!-- Tab Navigation -->
+    <nav class="tab-nav">
+        <button class="tab-btn active" data-tab="executive">Executive Summary</button>
+        <button class="tab-btn" data-tab="overview">Overview</button>
+        <button class="tab-btn" data-tab="lookup">Customer 360</button>
+        <button class="tab-btn" data-tab="recommend">Drink Recommendations</button>
+        <button class="tab-btn" data-tab="simulator">Campaign Simulator</button>
+        <button class="tab-btn" data-tab="segments">Segment Explorer</button>
+        <button class="tab-btn" data-tab="trends">Order Trends</button>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main">
+
+        <!-- ===== EXECUTIVE SUMMARY TAB ===== -->
+        <section class="tab-panel active" id="tab-executive">
+            <div class="hero-section">
+                <h2 class="hero-title">Starbucks Customer Segmentation</h2>
+                <p class="hero-subtitle">A customer analytics dashboard built from 100K orders, with segment profiles,
+                    churn scoring, and drink recommendation logic.</p>
+            </div>
+
+            <div class="kpi-grid" id="execKPIs"></div>
+
+            <div class="exec-grid">
+                <div class="card">
+                    <div class="card-title"><span class="dot"></span>Key Findings</div>
+                    <div id="execFindings"></div>
+                </div>
+                <div class="card">
+                    <div class="card-title"><span class="dot"></span>Top Opportunities</div>
+                    <div id="execOpportunities"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><span class="dot"></span>Methodology</div>
+                <div id="execMethodology" class="methodology-list"></div>
+            </div>
+        </section>
+
+        <!-- ===== OVERVIEW TAB ===== -->
+        <section class="tab-panel" id="tab-overview">
+            <div class="kpi-grid" id="kpiGrid"></div>
+            <div class="chart-grid">
+                <div class="card">
+                    <div class="card-title"><span class="dot"></span>Segment Distribution</div>
+                    <div class="chart-container"><canvas id="segmentDonut"></canvas></div>
+                </div>
+                <div class="card">
+                    <div class="card-title"><span class="dot"></span>Churn Risk Distribution</div>
+                    <div class="chart-container"><canvas id="churnDonut"></canvas></div>
+                </div>
+            </div>
+            <div class="chart-grid">
+                <div class="card">
+                    <div class="card-title"><span class="dot"></span>Key Metrics by Segment</div>
+                    <div class="chart-container"><canvas id="segmentBar"></canvas></div>
+                </div>
+                <div class="card">
+                    <div class="card-title"><span class="dot"></span>At-Risk Customers (Top 10)</div>
+                    <div style="overflow-x:auto;" id="atRiskTable"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== CUSTOMER 360 TAB ===== -->
+        <section class="tab-panel" id="tab-lookup">
+            <div class="search-container">
+                <div class="search-box">
+                    <span class="search-icon">&#128269;</span>
+                    <input type="text" class="search-input" id="searchInput"
+                        placeholder="Search by Customer ID (e.g. CUST_12974)..." autocomplete="off">
+                    <div class="search-results" id="searchResults"></div>
+                </div>
+            </div>
+
+            <div class="customer-profile" id="customerProfile">
+                <div class="profile-header">
+                    <div>
+                        <div class="profile-id" id="profileId">--</div>
+                        <div class="profile-sub" id="profileDates">--</div>
+                    </div>
+                    <div class="profile-badges">
+                        <span class="segment-badge" id="profileBadge">--</span>
+                        <span class="churn-badge" id="profileChurn">--</span>
+                    </div>
+                </div>
+
+                <div class="profile-grid" id="profileStats"></div>
+
+                <!-- Sub-tabs within Customer 360 -->
+                <div class="sub-tabs">
+                    <button class="sub-tab-btn active" data-subtab="actions">Recommended Actions</button>
+                    <button class="sub-tab-btn" data-subtab="timeline">Order Timeline</button>
+                    <button class="sub-tab-btn" data-subtab="peer">Peer Comparison</button>
+                </div>
+
+                <div class="sub-panel active" id="sub-actions">
+                    <div class="rec-grid" id="recGrid"></div>
+                </div>
+                <div class="sub-panel" id="sub-timeline">
+                    <div class="chart-grid">
+                        <div class="card">
+                            <div class="card-title"><span class="dot"></span>Spending Over Time</div>
+                            <div class="chart-container"><canvas id="timelineSpend"></canvas></div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title"><span class="dot"></span>Order Frequency</div>
+                            <div class="chart-container"><canvas id="timelineOrders"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="trend-badge" id="spendTrend"></div>
+                </div>
+                <div class="sub-panel" id="sub-peer">
+                    <div class="card">
+                        <div class="card-title"><span class="dot"></span>You vs Segment Average</div>
+                        <div class="chart-container" style="height:350px"><canvas id="peerRadar"></canvas></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="lookupEmpty" class="empty-state">
+                Search for a customer ID to explore their full 360 profile, behavior timeline, and personalized
+                recommendations.
+            </div>
+        </section>
+
+        <!-- ===== DRINK RECOMMENDATIONS TAB ===== -->
+        <section class="tab-panel" id="tab-recommend">
+            <div class="search-container">
+                <div class="search-box">
+                    <span class="search-icon">&#128269;</span>
+                    <input type="text" class="search-input" id="drinkSearchInput"
+                        placeholder="Enter Customer ID for drink recommendations..." autocomplete="off">
+                </div>
+            </div>
+
+            <div id="drinkRecResults" style="display:none">
+                <div class="rec-header">
+                    <h3 id="drinkRecTitle">--</h3>
+                    <div class="pills" id="drinksTried"></div>
+                </div>
+                <div class="drink-rec-grid" id="drinkRecGrid"></div>
+            </div>
+
+            <div id="drinkRecEmpty" class="empty-state">
+                Enter a customer ID to get personalized drink recommendations based on their segment and order history.
+            </div>
+        </section>
+
+        <!-- ===== CAMPAIGN SIMULATOR TAB ===== -->
+        <section class="tab-panel" id="tab-simulator">
+            <div class="sim-container">
+                <div class="card sim-form-card">
+                    <div class="card-title"><span class="dot"></span>Configure Campaign</div>
+                    <div class="sim-form">
+                        <div class="form-group">
+                            <label>Target Segment</label>
+                            <select id="simSegment" class="form-select"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Campaign Type</label>
+                            <select id="simCampaign" class="form-select">
+                                <option value="discount">Discount / Promotion</option>
+                                <option value="loyalty">Loyalty Program</option>
+                                <option value="reactivation">Reactivation / Win-Back</option>
+                                <option value="upsell">Upsell / Premiumization</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Intensity</label>
+                            <div class="intensity-btns">
+                                <button class="int-btn" data-val="0.5">Light</button>
+                                <button class="int-btn active" data-val="1.0">Standard</button>
+                                <button class="int-btn" data-val="1.5">Aggressive</button>
+                            </div>
+                        </div>
+                        <button class="sim-run-btn" id="simRunBtn">Run Simulation</button>
+                    </div>
+                </div>
+                <div class="card sim-results-card" id="simResults" style="display:none">
+                    <div class="card-title"><span class="dot"></span>Simulation Results</div>
+                    <div id="simResultsContent"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== SEGMENT EXPLORER TAB ===== -->
+        <section class="tab-panel" id="tab-segments">
+            <div class="explorer-controls">
+                <div class="form-group">
+                    <label>X Axis</label>
+                    <select id="explorerX" class="form-select"></select>
+                </div>
+                <div class="form-group">
+                    <label>Y Axis</label>
+                    <select id="explorerY" class="form-select"></select>
+                </div>
+                <button class="sim-run-btn" id="explorerBtn">Update</button>
+            </div>
+            <div class="card">
+                <div class="card-title"><span class="dot"></span>Customer Scatter Plot</div>
+                <div class="chart-container" style="height:450px"><canvas id="explorerScatter"></canvas></div>
+            </div>
+            <div class="chart-grid">
+                <div class="card">
+                    <div class="card-title"><span class="dot"></span>Segment Comparison (Radar)</div>
+                    <div class="chart-container"><canvas id="radarChart"></canvas></div>
+                </div>
+                <div class="card">
+                    <div class="card-title"><span class="dot"></span>Metric Comparison</div>
+                    <div class="chart-container"><canvas id="compareBar"></canvas></div>
+                </div>
+            </div>
+            <div class="segment-grid" id="segmentCards"></div>
+        </section>
+
+        <!-- ===== TRENDS TAB ===== -->
+        <section class="tab-panel" id="tab-trends">
+            <div class="chart-grid">
+                <div class="card">
+                    <div class="card-title"><span class="dot"></span>Orders by Day of Week</div>
+                    <div class="chart-container"><canvas id="dayChart"></canvas></div>
+                </div>
+                <div class="card">
+                    <div class="card-title"><span class="dot"></span>Orders by Hour of Day</div>
+                    <div class="chart-container"><canvas id="hourChart"></canvas></div>
+                </div>
+            </div>
+            <div class="chart-grid">
+                <div class="card">
+                    <div class="card-title"><span class="dot"></span>Channel Distribution</div>
+                    <div class="chart-container"><canvas id="channelChart"></canvas></div>
+                </div>
+                <div class="card">
+                    <div class="card-title"><span class="dot"></span>Drink Category Popularity</div>
+                    <div class="chart-container"><canvas id="drinkChart"></canvas></div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title"><span class="dot"></span>Monthly Order Volume & Avg Spend</div>
+                <div class="chart-container" style="height:350px"><canvas id="monthlyChart"></canvas></div>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>

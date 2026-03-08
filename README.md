@@ -120,7 +120,7 @@ K-Means clustering was tested across multiple values of `k`.
 - Best result in the notebook: `k = 2`
 - Silhouette score: `0.1184`
 
-### Segment 0: Digital, higher-value customers
+### Segment 0: Digital Convenience Customers
 
 - `48.8%` of customers
 - higher average spend
@@ -129,7 +129,7 @@ K-Means clustering was tested across multiple values of `k`.
 - much higher order-ahead usage
 - strong Mobile App preference
 
-### Segment 1: More traditional customers
+### Segment 1: Store-First Value Customers
 
 - `51.2%` of customers
 - lower average spend
