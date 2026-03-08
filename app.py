@@ -19,18 +19,11 @@ app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), na
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 # Data loading
-RAW_DATA_PATH = os.path.join(BASE_DIR, "starbucks_customer_ordering_patterns.csv")
-CUSTOMER_DATA_PATH = os.path.join(BASE_DIR, "customer_segments_output.csv")
+raw_data = pd.read_csv(os.path.join(BASE_DIR, "starbucks_customer_ordering_patterns.csv"))
+raw_data["order_date"] = pd.to_datetime(raw_data["order_date"])
+raw_data["order_hour"] = raw_data["order_time"].str.split(":").str[0].astype(int)
 
-raw_data = None
-raw_data_available = os.path.exists(RAW_DATA_PATH)
-if raw_data_available:
-    raw_data = pd.read_csv(RAW_DATA_PATH)
-    raw_data["order_date"] = pd.to_datetime(raw_data["order_date"])
-    raw_data["order_hour"] = raw_data["order_time"].str.split(":").str[0].astype(int)
-
-customers = pd.read_csv(CUSTOMER_DATA_PATH)
-total_orders_all = int(customers["total_orders"].sum())
+customers = pd.read_csv(os.path.join(BASE_DIR, "customer_segments_output.csv"))
 
 # Pre-compute: Segment profiles
 segment_profiles = {}
@@ -62,46 +55,41 @@ for seg_name in customers["segment_name"].unique():
             profile[col] = round(seg[col].mean() * 100, 1)
     segment_profiles[seg_name] = profile
 
+# Pre-compute: Drink association rules
+# For each drink, find what other drinks are commonly ordered by the same customer
 drink_associations = {}
-all_drinks = sorted(customers["favorite_drink_category"].dropna().unique().tolist())
+customer_drinks = raw_data.groupby("customer_id")["drink_category"].apply(set).to_dict()
 
-if raw_data_available:
-    # For each drink, find what other drinks are commonly ordered by the same customer
-    customer_drinks = raw_data.groupby("customer_id")["drink_category"].apply(set).to_dict()
-    all_drinks = raw_data["drink_category"].unique().tolist()
-    for drink in all_drinks:
-        buyers = [cid for cid, drinks in customer_drinks.items() if drink in drinks]
-        co_drinks = Counter()
-        for cid in buyers:
-            for d in customer_drinks[cid]:
-                if d != drink:
-                    co_drinks[d] += 1
-        total = len(buyers) if buyers else 1
-        drink_associations[drink] = {
-            d: round(count / total, 3)
-            for d, count in co_drinks.most_common(10)
-        }
+all_drinks = raw_data["drink_category"].unique().tolist()
+for drink in all_drinks:
+    # Customers who ordered this drink
+    buyers = [cid for cid, drinks in customer_drinks.items() if drink in drinks]
+    # What else did they order?
+    co_drinks = Counter()
+    for cid in buyers:
+        for d in customer_drinks[cid]:
+            if d != drink:
+                co_drinks[d] += 1
+    total = len(buyers) if buyers else 1
+    drink_associations[drink] = {
+        d: round(count / total, 3)
+        for d, count in co_drinks.most_common(10)
+    }
 
 # Segment drink popularity
 segment_drink_popularity = {}
 for seg_name in customers["segment_name"].unique():
     seg_ids = set(customers[customers["segment_name"] == seg_name]["customer_id"])
-    if raw_data_available:
-        seg_orders = raw_data[raw_data["customer_id"].isin(seg_ids)]
-        total_seg_orders = len(seg_orders)
-        drink_counts = seg_orders["drink_category"].value_counts()
-        segment_drink_popularity[seg_name] = {
-            drink: round(count / total_seg_orders * 100, 1)
-            for drink, count in drink_counts.items()
-        }
-    else:
-        seg = customers[customers["segment_name"] == seg_name]
-        drink_counts = seg["favorite_drink_category"].value_counts()
-        total_seg_customers = max(len(seg), 1)
-        segment_drink_popularity[seg_name] = {
-            drink: round(count / total_seg_customers * 100, 1)
-            for drink, count in drink_counts.items()
-        }
+    seg_orders = raw_data[raw_data["customer_id"].isin(seg_ids)]
+    total_seg_orders = len(seg_orders)
+    drink_counts = seg_orders["drink_category"].value_counts()
+    segment_drink_popularity[seg_name] = {
+        drink: round(count / total_seg_orders * 100, 1)
+        for drink, count in drink_counts.items()
+    }
+
+# Pre-compute: Churn risk scores
+max_date = raw_data["order_date"].max()
 
 def compute_churn_score(row):
     """Heuristic churn score 0-100. Higher = more likely to churn."""
@@ -148,54 +136,6 @@ def clean_for_json(obj):
     elif isinstance(obj, pd.Timestamp):
         return str(obj.date())
     return obj
-
-
-def get_customer_top_channels(customer_row):
-    channel_map = {
-        "mobile_app_rate": "Mobile App",
-        "drive_thru_rate": "Drive-Thru",
-        "in_store_cashier_rate": "In-Store Cashier",
-        "kiosk_rate": "Kiosk",
-    }
-    ranked = []
-    for col, label in channel_map.items():
-        if col in customer_row.index:
-            ranked.append((label, round(float(customer_row[col]) * 100, 1)))
-    ranked.sort(key=lambda item: item[1], reverse=True)
-    return {label: value for label, value in ranked[:3] if value > 0}
-
-
-def build_fallback_trends():
-    channel_specs = [
-        ("Mobile App", "mobile_app_rate"),
-        ("Drive-Thru", "drive_thru_rate"),
-        ("In-Store Cashier", "in_store_cashier_rate"),
-        ("Kiosk", "kiosk_rate"),
-    ]
-    channel_labels = []
-    channel_values = []
-    channel_spend = []
-    for label, col in channel_specs:
-        if col in customers.columns:
-            approx_orders = float((customers[col] * customers["total_orders"]).sum())
-            channel_labels.append(label)
-            channel_values.append(round(approx_orders))
-            active = customers[customers[col] > 0]
-            channel_spend.append(round(float(active["avg_total_spend"].mean()), 2) if not active.empty else 0.0)
-
-    drink_counts = customers["favorite_drink_category"].value_counts()
-    return {
-        "by_day": {"labels": [], "values": []},
-        "by_hour": {"labels": [], "values": []},
-        "by_channel": {
-            "labels": channel_labels,
-            "values": channel_values,
-            "avg_spend": channel_spend,
-        },
-        "by_drink": {"labels": drink_counts.index.tolist(), "values": drink_counts.tolist()},
-        "monthly": {"labels": [], "orders": [], "avg_spend": []},
-        "raw_data_available": False,
-    }
 
 # Action recommendation engine
 
@@ -268,10 +208,9 @@ async def api_segments():
     return clean_for_json({
         "segments": list(segment_profiles.values()),
         "total_customers": int(len(customers)),
-        "total_orders": total_orders_all,
+        "total_orders": int(len(raw_data)),
         "overall_avg_spend": round(float(customers["avg_total_spend"].mean()), 2),
         "overall_avg_satisfaction": round(float(customers["avg_customer_satisfaction"].mean()), 2),
-        "raw_data_available": raw_data_available,
     })
 
 @app.get("/api/compare")
@@ -298,9 +237,6 @@ async def api_compare():
 
 @app.get("/api/trends")
 async def api_trends():
-    if not raw_data_available:
-        return clean_for_json(build_fallback_trends())
-
     day_order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     day_counts = raw_data["day_of_week"].value_counts().reindex(day_order).fillna(0)
     hour_counts = raw_data["order_hour"].value_counts().sort_index()
@@ -328,7 +264,6 @@ async def api_trends():
             "orders": monthly["orders"].tolist(),
             "avg_spend": monthly["avg_spend"].tolist(),
         },
-        "raw_data_available": True,
     })
 
 # Routes: Customer APIs
@@ -342,31 +277,16 @@ async def api_customer(customer_id: str):
 
     row_dict = clean_for_json(row.iloc[0].to_dict())
 
-    customer_row = row.iloc[0]
-    if raw_data_available:
-        cust_orders = raw_data[raw_data["customer_id"] == customer_id]
-        order_history = {
-            "total_orders": int(len(cust_orders)),
-            "first_order": str(cust_orders["order_date"].min().date()) if not cust_orders.empty else None,
-            "last_order": str(cust_orders["order_date"].max().date()) if not cust_orders.empty else None,
-            "top_channels": cust_orders["order_channel"].value_counts().head(3).to_dict(),
-            "top_drinks": cust_orders["drink_category"].value_counts().head(3).to_dict(),
-        }
-    else:
-        order_history = {
-            "total_orders": int(customer_row["total_orders"]),
-            "first_order": None,
-            "last_order": None,
-            "top_channels": get_customer_top_channels(customer_row),
-            "top_drinks": (
-                {customer_row["favorite_drink_category"]: 1}
-                if pd.notna(customer_row.get("favorite_drink_category"))
-                else {}
-            ),
-            "note": "Detailed order history is unavailable in this deployed version because the raw transaction file is not included.",
-        }
+    cust_orders = raw_data[raw_data["customer_id"] == customer_id]
+    order_history = {
+        "total_orders": int(len(cust_orders)),
+        "first_order": str(cust_orders["order_date"].min().date()) if not cust_orders.empty else None,
+        "last_order": str(cust_orders["order_date"].max().date()) if not cust_orders.empty else None,
+        "top_channels": cust_orders["order_channel"].value_counts().head(3).to_dict(),
+        "top_drinks": cust_orders["drink_category"].value_counts().head(3).to_dict(),
+    }
 
-    recs = get_action_recommendations(customer_row)
+    recs = get_action_recommendations(row.iloc[0])
 
     return clean_for_json({
         "customer": row_dict,
@@ -396,29 +316,6 @@ async def api_customer_search(q: str = Query("", min_length=0)):
 @app.get("/api/customer/{customer_id}/timeline")
 async def api_customer_timeline(customer_id: str):
     customer_id = customer_id.upper()
-    row = customers[customers["customer_id"] == customer_id]
-    if row.empty:
-        raise HTTPException(status_code=404, detail=f"Customer {customer_id} not found")
-
-    if not raw_data_available:
-        customer_row = row.iloc[0]
-        seg = customers[customers["segment_name"] == customer_row["segment_name"]]
-        compare_keys = ["avg_total_spend", "total_orders", "avg_cart_size",
-                        "avg_num_customizations", "avg_customer_satisfaction", "order_ahead_rate"]
-        compare_labels = ["Spend", "Orders", "Cart Size", "Customizations", "Satisfaction", "Order Ahead"]
-        return clean_for_json({
-            "monthly": {"labels": [], "orders": [], "avg_spend": [], "avg_satisfaction": []},
-            "channel_evolution": [],
-            "spend_trend": "not available",
-            "peer_comparison": {
-                "labels": compare_labels,
-                "customer": [round(float(customer_row[k]), 2) for k in compare_keys],
-                "segment_avg": [round(float(seg[k].mean()), 2) for k in compare_keys],
-            },
-            "order_count": int(customer_row["total_orders"]),
-            "note": "Timeline charts require raw order-level data and are not available in this deployed version.",
-        })
-
     cust_orders = raw_data[raw_data["customer_id"] == customer_id].sort_values("order_date")
 
     if cust_orders.empty:
@@ -454,14 +351,14 @@ async def api_customer_timeline(customer_id: str):
         spend_trend = "not enough data"
 
     # Peer comparison: customer vs segment average
-    customer_row = row.iloc[0]
-    seg = customers[customers["segment_name"] == customer_row["segment_name"]]
+    row = customers[customers["customer_id"] == customer_id].iloc[0]
+    seg = customers[customers["segment_name"] == row["segment_name"]]
     compare_keys = ["avg_total_spend", "total_orders", "avg_cart_size",
                     "avg_num_customizations", "avg_customer_satisfaction", "order_ahead_rate"]
     compare_labels = ["Spend", "Orders", "Cart Size", "Customizations", "Satisfaction", "Order Ahead"]
     peer_comparison = {
         "labels": compare_labels,
-        "customer": [round(float(customer_row[k]), 2) for k in compare_keys],
+        "customer": [round(float(row[k]), 2) for k in compare_keys],
         "segment_avg": [round(float(seg[k].mean()), 2) for k in compare_keys],
     }
 
@@ -488,15 +385,11 @@ async def api_drink_recommendations(customer_id: str):
         raise HTTPException(status_code=404, detail=f"Customer {customer_id} not found")
 
     seg_name = row.iloc[0]["segment_name"]
-    if raw_data_available:
-        cust_orders = raw_data[raw_data["customer_id"] == customer_id]
-        ordered_drinks = set(cust_orders["drink_category"].unique())
-        all_available = set(raw_data["drink_category"].unique())
-    else:
-        favorite_drink = row.iloc[0].get("favorite_drink_category")
-        ordered_drinks = {favorite_drink} if pd.notna(favorite_drink) else set()
-        all_available = set(all_drinks)
+    cust_orders = raw_data[raw_data["customer_id"] == customer_id]
+    ordered_drinks = set(cust_orders["drink_category"].unique())
 
+    # All drinks available
+    all_available = set(raw_data["drink_category"].unique())
     not_tried = all_available - ordered_drinks
 
     recs = []
@@ -513,44 +406,34 @@ async def api_drink_recommendations(customer_id: str):
         })
 
     # Method 2: Association rules from drinks they DO order
-    if raw_data_available:
-        for ordered in ordered_drinks:
-            assoc = drink_associations.get(ordered, {})
-            for drink, strength in assoc.items():
-                if drink in not_tried:
-                    existing = next((r for r in recs if r["drink"] == drink), None)
-                    assoc_score = strength * 100
-                    if existing:
-                        existing["score"] = max(existing["score"], assoc_score)
-                        existing["assoc_reason"] = f"Customers who order {ordered} also enjoy {drink} ({strength*100:.0f}%)"
-                    else:
-                        recs.append({
-                            "drink": drink,
-                            "score": assoc_score,
-                            "reason": f"Customers who order {ordered} also enjoy {drink} ({strength*100:.0f}%)",
-                            "method": "association"
-                        })
+    for ordered in ordered_drinks:
+        assoc = drink_associations.get(ordered, {})
+        for drink, strength in assoc.items():
+            if drink in not_tried:
+                existing = next((r for r in recs if r["drink"] == drink), None)
+                assoc_score = strength * 100
+                if existing:
+                    existing["score"] = max(existing["score"], assoc_score)
+                    existing["assoc_reason"] = f"Customers who order {ordered} also enjoy {drink} ({strength*100:.0f}%)"
+                else:
+                    recs.append({
+                        "drink": drink,
+                        "score": assoc_score,
+                        "reason": f"Customers who order {ordered} also enjoy {drink} ({strength*100:.0f}%)",
+                        "method": "association"
+                    })
 
     # Method 3: If already tried all drinks, suggest re-trying less-ordered ones
     if not recs:
-        if raw_data_available:
-            drink_freq = cust_orders["drink_category"].value_counts()
-            least_ordered = drink_freq.tail(3)
-            for drink, count in least_ordered.items():
-                recs.append({
-                    "drink": drink,
-                    "score": 50,
-                    "reason": f"You have only ordered {drink} {count} time(s) - give it another try!",
-                    "method": "rediscovery"
-                })
-        else:
-            for drink, score in list(seg_pop.items())[:3]:
-                recs.append({
-                    "drink": drink,
-                    "score": score,
-                    "reason": f"Often preferred by customers in the {seg_name} segment.",
-                    "method": "segment_preference"
-                })
+        drink_freq = cust_orders["drink_category"].value_counts()
+        least_ordered = drink_freq.tail(3)
+        for drink, count in least_ordered.items():
+            recs.append({
+                "drink": drink,
+                "score": 50,
+                "reason": f"You have only ordered {drink} {count} time(s) - give it another try!",
+                "method": "rediscovery"
+            })
 
     # Sort by score and return top 5
     recs.sort(key=lambda x: x["score"], reverse=True)
@@ -559,7 +442,6 @@ async def api_drink_recommendations(customer_id: str):
         "segment": seg_name,
         "drinks_tried": list(ordered_drinks),
         "recommendations": recs[:5],
-        "raw_data_available": raw_data_available,
     })
 
 # Routes: Churn Risk
@@ -733,7 +615,7 @@ async def api_explorer(
 @app.get("/api/executive_summary")
 async def api_executive_summary():
     total_cust = len(customers)
-    total_orders = total_orders_all
+    total_orders = len(raw_data)
     avg_spend = round(float(customers["avg_total_spend"].mean()), 2)
     avg_sat = round(float(customers["avg_customer_satisfaction"].mean()), 2)
     total_rev = round(float(customers["total_revenue"].sum()), 0)
@@ -751,19 +633,9 @@ async def api_executive_summary():
         })
 
     # Channel insight
-    if raw_data_available:
-        channel_dom = raw_data["order_channel"].value_counts()
-        top_channel = channel_dom.index[0]
-        top_channel_pct = round(channel_dom.iloc[0] / total_orders * 100, 1)
-    else:
-        approx_channel_totals = {
-            "Mobile App": float((customers.get("mobile_app_rate", 0) * customers["total_orders"]).sum()),
-            "Drive-Thru": float((customers.get("drive_thru_rate", 0) * customers["total_orders"]).sum()),
-            "In-Store Cashier": float((customers.get("in_store_cashier_rate", 0) * customers["total_orders"]).sum()),
-            "Kiosk": float((customers.get("kiosk_rate", 0) * customers["total_orders"]).sum()),
-        }
-        top_channel = max(approx_channel_totals, key=approx_channel_totals.get)
-        top_channel_pct = round(approx_channel_totals[top_channel] / max(total_orders, 1) * 100, 1)
+    channel_dom = raw_data["order_channel"].value_counts()
+    top_channel = channel_dom.index[0]
+    top_channel_pct = round(channel_dom.iloc[0] / total_orders * 100, 1)
     findings.append({
         "title": f"{top_channel} is the leading channel",
         "detail": f"{top_channel} accounts for {top_channel_pct}% of all orders. "
@@ -827,7 +699,6 @@ async def api_executive_summary():
             "avg_satisfaction": avg_sat,
             "segments": len(segment_profiles),
             "high_risk_customers": int(len(customers[customers["churn_risk"] == "High"])),
-            "raw_data_available": raw_data_available,
         },
         "findings": findings,
         "opportunities": opportunities,
