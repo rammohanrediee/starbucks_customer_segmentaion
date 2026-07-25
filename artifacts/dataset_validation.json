@@ -1,0 +1,9 @@
+{
+  "is_valid": true,
+  "row_count": 100000,
+  "unique_customers": 14988,
+  "duplicate_order_ids": 0,
+  "errors": [],
+  "path": "starbucks_customer_ordering_patterns.csv",
+  "sha256": "a63088f7e1663927fdd52df7a70ef9e2093bda7e06de17f0dd33f95ef4ef0247"
+}
