@@ -1,6 +1,8 @@
-# Starbucks Customer Segmentation and Analytics ☕
+# Starbucks-Style Customer Segmentation and Analytics
 
-This project analyzes Starbucks-style order data to understand customer behavior, identify meaningful customer groups, and present the results in both a notebook and an interactive dashboard.
+This project explores customer behavior in a Kaggle order dataset and presents
+the results through a notebook and a FastAPI dashboard. It is an independent
+portfolio analysis and is not affiliated with Starbucks.
 
 ## Project Goal 🎯
 
@@ -14,7 +16,16 @@ I wanted to answer questions like:
 - Who seems more value-focused?
 - What kind of customer groups can help with offers, loyalty, and customer experience?
 
-## Dataset Summary 📊
+## Dataset
+
+The raw CSV comes from Likitha Gedipudi's
+[Starbucks Customer Ordering Patterns](https://www.kaggle.com/datasets/likithagedipudi/starbucks-customer-ordering-patterns)
+dataset on Kaggle. It is a simulated 100,000-transaction dataset covering
+2024–2025 and is published under the CC0 Public Domain license. See
+[DATASET.md](DATASET.md) for the version, integrity hashes, validation contract,
+and limitations.
+
+Do not describe these rows as official Starbucks customer records.
 
 - `100,000` order records
 - `14,988` unique customers
@@ -25,7 +36,7 @@ I wanted to answer questions like:
 
 Since the data is at the order level, I first converted it into customer-level behavior before building segments.
 
-## Project Files 🗂️
+## Project files
 
 - `starbucks_customer_segmentation.ipynb`  
   Main notebook for analysis, feature creation, clustering, and segment interpretation.
@@ -48,7 +59,17 @@ Since the data is at the order level, I first converted it into customer-level b
 - `customer_segments_output.csv`  
   Customer-level dataset with final segment assignments.
 
-## What I Did 🔎
+- `analysis/`
+  Reusable dataset validation and clustering evaluation code.
+
+- `scripts/`
+  Command-line checks that generate machine-readable validation evidence.
+
+- `tests/` and `.github/workflows/ci.yml`
+  API, data-contract, and model-evaluation tests run on every push and pull
+  request.
+
+## Method
 
 The workflow followed these steps:
 
@@ -60,7 +81,7 @@ The workflow followed these steps:
 6. reviewed the groups and gave them practical names
 7. built a dashboard to explore the results
 
-## Insights in Simple Terms 💡
+## Findings
 
 Here are the main things I found, without the technical language.
 
@@ -113,7 +134,12 @@ The real difference was:
 
 So the strongest split in this dataset is more about customer style than customer frequency.
 
-## Final Customer Segments 👥
+## Customer segments
+
+K-Means selected `k=2` because it had the highest tested silhouette score:
+`0.1190`. That score is weak and indicates substantial overlap. The two groups
+are useful as exploratory behavioral summaries, but they are not cleanly
+separated personas and should not be treated as ground truth.
 
 The final result produced two main customer groups.
 
@@ -139,7 +165,7 @@ In simple terms, these are the customers who like convenience, use digital chann
 
 In simple terms, these customers look more traditional in how they order and seem more value-conscious.
 
-## Business Meaning 📌
+## Business use
 
 These segments can help answer real business questions:
 
@@ -150,7 +176,7 @@ These segments can help answer real business questions:
 
 That is why this segmentation is useful beyond just the model itself.
 
-## Dashboard Features 🖥️
+## Dashboard
 
 Along with the notebook, I built a FastAPI dashboard to explore the results.
 
@@ -163,7 +189,7 @@ The dashboard includes:
 - campaign simulation by segment
 - order trend analysis
 
-## Tools Used 🛠️
+## Tools
 
 - Python
 - Pandas
@@ -175,7 +201,24 @@ The dashboard includes:
 - Jinja2
 - Chart.js
 
-## How to Run ▶️
+## Reproduce the checks
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m scripts.validate_dataset
+python -m scripts.evaluate_segmentation
+coverage run --source=analysis -m unittest discover -s tests -v
+coverage report --show-missing --fail-under=90
+```
+
+The clustering evaluation writes its metrics to
+`artifacts/clustering_metrics.json`.
+
+The coverage threshold applies to the reusable validation and clustering
+modules. Dashboard routes have separate API smoke tests; the repository does
+not claim 90% coverage for the full web application.
+
+## Run locally
 
 ### Run the notebook
 
@@ -186,7 +229,7 @@ jupyter notebook starbucks_customer_segmentation.ipynb
 ### Run the dashboard
 
 ```bash
-uvicorn app:app --reload
+uvicorn app:app --reload --port 8000
 ```
 
 Then open:
@@ -195,13 +238,29 @@ Then open:
 http://127.0.0.1:8000
 ```
 
-## Future Improvements 🚀
+## Container and deployment
 
-- improve the recommendation system
-- compare this clustering approach with other methods
-- connect the segments to actual marketing actions
-- test how these segments behave over time
+```bash
+docker build -t starbucks-segmentation .
+docker run --rm -p 8000:8000 starbucks-segmentation
+curl http://127.0.0.1:8000/api/health
+```
+
+The Docker configuration is compatible with services that provide a `PORT`
+environment variable, including Railway. This repository does not claim a live
+Railway deployment until a public service URL and successful health check are
+recorded here.
+
+## Limitations and next work
+
+- regenerate `customer_segments_output.csv` through a standalone feature
+  pipeline instead of relying on notebook state
+- compare K-Means with density-based and hierarchical approaches
+- validate whether the segments remain stable across time windows
+- evaluate campaign recommendations against observed outcomes before treating
+  them as business impact
 
 ## Final Note
 
-This project is not just about grouping customers with a model. It is about understanding customer behavior in a clear way and turning that into something practical through both analysis and a working dashboard.
+The dashboard demonstrates how exploratory segments can support analysis. It
+does not establish causal business impact or production readiness on its own.

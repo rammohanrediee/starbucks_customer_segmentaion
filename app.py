@@ -1,15 +1,15 @@
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-from starlette.requests import Request
-from pydantic import BaseModel
-from typing import Optional
-import pandas as pd
-import numpy as np
-from collections import Counter
 import os
+from collections import Counter
+
+import numpy as np
+import pandas as pd
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
+from starlette.requests import Request
 
 app = FastAPI(title="Starbucks Customer Segmentation Dashboard")
 
@@ -31,7 +31,7 @@ for seg_name in customers["segment_name"].unique():
     seg = customers[customers["segment_name"] == seg_name]
     profile = {
         "name": seg_name,
-        "size": int(len(seg)),
+        "size": len(seg),
         "pct": round(len(seg) / len(customers) * 100, 1),
         "avg_spend": round(seg["avg_total_spend"].mean(), 2),
         "avg_orders": round(seg["total_orders"].mean(), 1),
@@ -201,14 +201,24 @@ def get_action_recommendations(customer_row):
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+
+@app.get("/api/health")
+async def api_health():
+    return {
+        "status": "ok",
+        "orders": len(raw_data),
+        "customers": len(customers),
+    }
+
+
 # Routes: Segment APIs
 
 @app.get("/api/segments")
 async def api_segments():
     return clean_for_json({
         "segments": list(segment_profiles.values()),
-        "total_customers": int(len(customers)),
-        "total_orders": int(len(raw_data)),
+        "total_customers": len(customers),
+        "total_orders": len(raw_data),
         "overall_avg_spend": round(float(customers["avg_total_spend"].mean()), 2),
         "overall_avg_satisfaction": round(float(customers["avg_customer_satisfaction"].mean()), 2),
     })
@@ -279,7 +289,7 @@ async def api_customer(customer_id: str):
 
     cust_orders = raw_data[raw_data["customer_id"] == customer_id]
     order_history = {
-        "total_orders": int(len(cust_orders)),
+        "total_orders": len(cust_orders),
         "first_order": str(cust_orders["order_date"].min().date()) if not cust_orders.empty else None,
         "last_order": str(cust_orders["order_date"].max().date()) if not cust_orders.empty else None,
         "top_channels": cust_orders["order_channel"].value_counts().head(3).to_dict(),
@@ -372,7 +382,7 @@ async def api_customer_timeline(customer_id: str):
         "channel_evolution": channel_by_half,
         "spend_trend": spend_trend,
         "peer_comparison": peer_comparison,
-        "order_count": int(len(cust_orders)),
+        "order_count": len(cust_orders),
     })
 
 # Routes: Drink Recommendation Engine
@@ -479,7 +489,7 @@ async def api_churn_scores():
 class CampaignRequest(BaseModel):
     segment: str
     campaign_type: str  # "discount", "loyalty", "reactivation", "upsell"
-    intensity: Optional[float] = 1.0  # 0.5 = light, 1.0 = standard, 1.5 = aggressive
+    intensity: float | None = 1.0  # 0.5 = light, 1.0 = standard, 1.5 = aggressive
 
 @app.post("/api/simulate")
 async def api_simulate(req: CampaignRequest):
@@ -491,7 +501,6 @@ async def api_simulate(req: CampaignRequest):
     avg_spend = float(seg["avg_total_spend"].mean())
     avg_orders = float(seg["total_orders"].mean())
     avg_revenue = float(seg["total_revenue"].mean())
-    avg_sat = float(seg["avg_customer_satisfaction"].mean())
     intensity = max(0.5, min(req.intensity or 1.0, 2.0))
 
     result = {"segment": req.segment, "campaign_type": req.campaign_type,
@@ -698,7 +707,7 @@ async def api_executive_summary():
             "avg_spend": avg_spend,
             "avg_satisfaction": avg_sat,
             "segments": len(segment_profiles),
-            "high_risk_customers": int(len(customers[customers["churn_risk"] == "High"])),
+            "high_risk_customers": len(customers[customers["churn_risk"] == "High"]),
         },
         "findings": findings,
         "opportunities": opportunities,
@@ -715,4 +724,8 @@ async def api_executive_summary():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)
+    uvicorn.run(
+        "app:app",
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "8000")),
+    )

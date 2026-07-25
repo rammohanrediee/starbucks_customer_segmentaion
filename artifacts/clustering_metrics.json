@@ -1,0 +1,48 @@
+{
+  "selection_rule": "highest silhouette among k=2..6",
+  "interpretation": "Exploratory segmentation only. A silhouette below 0.25 indicates substantial overlap and should not be treated as ground-truth personas.",
+  "best_k": 2,
+  "best_silhouette": 0.119,
+  "candidates": [
+    {
+      "k": 2,
+      "inertia": 235847.5132,
+      "silhouette": 0.119,
+      "calinski_harabasz": 2156.3679,
+      "davies_bouldin": 2.5003,
+      "min_cluster_share": 0.4835
+    },
+    {
+      "k": 3,
+      "inertia": 222918.417,
+      "silhouette": 0.0918,
+      "calinski_harabasz": 1575.202,
+      "davies_bouldin": 2.7259,
+      "min_cluster_share": 0.2744
+    },
+    {
+      "k": 4,
+      "inertia": 214330.354,
+      "silhouette": 0.0621,
+      "calinski_harabasz": 1292.2732,
+      "davies_bouldin": 2.7835,
+      "min_cluster_share": 0.2143
+    },
+    {
+      "k": 5,
+      "inertia": 207893.0569,
+      "silhouette": 0.0628,
+      "calinski_harabasz": 1115.1338,
+      "davies_bouldin": 2.6879,
+      "min_cluster_share": 0.1102
+    },
+    {
+      "k": 6,
+      "inertia": 202043.5233,
+      "silhouette": 0.0574,
+      "calinski_harabasz": 1004.6295,
+      "davies_bouldin": 2.6223,
+      "min_cluster_share": 0.0944
+    }
+  ]
+}
